@@ -1,0 +1,332 @@
+<html>
+    <head>
+        <title>Cue YouTube - Create and share YouTube playlists without logging in</title>
+        <meta name="description" content="A simple web page that allows you to search youtube videos instantly and add them to a playlist you can share with your friends without having to login to YouTube" />
+        <meta property="og:title" content="Cue YouTube"/>
+        <meta property="og:url" content="http://cueyoutube.com/" />
+        <meta property="og:site_name" content="Cue YouTube"/>
+        <meta property="og:description" content="A simple web page that allows you to search youtube videos instantly and add them to a playlist you can share with your friends without having to login to YouTube" />
+        <link rel="stylesheet" media="all" type="text/css" href="StackLayout/stacklayout.css" />
+        <!--[if lte IE 7]>
+        <link rel="stylesheet" media="all" type="text/css" href="StackLayout/stacklayout_lte_ie7.css" />
+        <![endif]-->
+        <link rel="stylesheet" media="all" type="text/css" href="StackLayout/mockups/skin_mockup.css" />
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.14/jquery-ui.min.js"></script>
+        <script type="text/javascript" src="jLy1.jquery.js"></script>
+        
+        <script type="text/javascript">
+
+            $(document).ready(function()
+            {
+                $(".search_input").focus();
+                $(".search_input").keyup(function() 
+                {
+                    var search_input = $(this).val();
+                    var keyword= encodeURIComponent(search_input);
+                    var yt_url='http://gdata.youtube.com/feeds/api/videos?q='+keyword+'&format=5&max-results=20&v=2&alt=jsonc'; 
+                
+                    $.ajax({
+                        type: "GET",
+                        url: yt_url,
+                        dataType:"jsonp",
+                        success: function(response)
+                        {
+                            if(response.data.items)
+                            {
+                                var items = new Array();
+                                
+                                $.each(response.data.items, function(i,data)
+                                {
+                                    var video_id=data.id;
+                                    var video_title=data.title;
+                                    var video_viewCount=data.viewCount;
+/*
+                                    var video_frame="<iframe width='480' height='390' src='http://www.youtube.com/embed/"+video_id+"?enablejsapi=1&version=3' frameborder='0' type='text/html'></iframe>";
+                                    var final="<div id='resultTitle'>"+video_title+" :: <a href='' onclick='return cueCurrentVideo(\""+video_title+"\",\""+video_id+"\");'>Click here to cue it!</a></div><div>"+video_frame+"</div><div id='count'>"+video_viewCount+" Views</div>";
+*/
+                                    items.push($("<li onclick=\"return cueItem(this);\" id=\""+video_id+"\">"+video_title+"</li>"));
+                                });
+                                
+                                var ol = $("<ol class=\"dataList\"><h4>Click an item to cue it</h4></ol>");
+                                
+                                $.each(items, function(i,data) 
+                                {
+                                    ol.append(data);
+                                });
+                                
+                                $("#resultContainer").empty();
+                                $("#resultContainer").append(ol);
+                                $("#resultContainer > ol > li").click(function () {
+                                      $(this).effect("highlight", {}, 3000);
+                                });
+                            }
+                                
+                            else
+                            {
+                                $("#resultContainer").html("<div id='no'>No Video</div>");
+                            }
+                        }
+                    });
+                });
+                
+	        $(function() {
+		    $( "#playlist" ).sortable();
+		    $( "#playlist" ).disableSelection();
+	        });
+	        
+                var tag = document.createElement('script');
+                tag.src = "http://www.youtube.com/player_api";
+                var firstScriptTag = document.getElementsByTagName('script')[0];
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+                var loc = new String(window.location);
+                var split = loc.split("#");
+                
+                if(split.length > 1)
+                {
+                    var ids = split[1].split(',');
+                    
+                    for(var i = 0;i < ids.length;i++)
+                    {
+                        $("li:contains('Nothing yet! Use the search on the left to find videos to cue up')").remove();
+                        var video_id = ids[i];
+                        
+                        if(video_id)
+                        {
+                            $.getScript( 'http://gdata.youtube.com/feeds/api/videos/' + encodeURIComponent( cleanYt(video_id) ) + '?v=2&alt=json-in-script&callback=addPlaylistItem' );
+                        }
+                    }
+                }
+            });
+
+            function cleanYt(id)
+            {
+                return id.replace(/[^A-Za-z0-9\-_]/,'');
+            }
+
+            function addPlaylistItem( data )
+            {
+                var video_id = data.entry["id"].$t.split(":");;
+                var video_id = video_id[video_id.length - 1];
+                var video_title = data.entry[ "title" ].$t;
+                $('#playlist').append($('<li id="'+video_id+'"><span class="videoTitle">'+video_title+'</span><br /><a href="" onclick="return playItem(this);">play</a> | <a href="" onclick="return remove(this);">remove</a></li>'));
+                var loc = new String(window.location);
+                loc = loc.replace(/,$/,'');
+                var split = loc.split("#");
+                var split = split[1].split(",");
+
+                if($("#playlist > li").size() == split.length)
+                {
+                    var ordered = new Array();
+                    
+                    $.each(split,function(index,data)
+                    {
+                        ordered.push($("#"+cleanYt(data)));
+                    });
+                    
+                    $("#playlist").empty();
+                    
+                    $.each(ordered,function(index,data)
+                    {
+                        $("#playlist").append($(data));
+                    });
+                }
+            }
+            
+            function editList()
+            {
+                $("#searchYoutube").show();
+                $("#editList").hide();
+                return false;
+            }
+
+            var player;
+            var current_track;
+
+            function playItem(a)
+            {
+                $("#searchYoutube").hide();
+                $("#editList").show();
+                playTrack($(a).parent());
+                return false;
+            }
+
+            function playIt()
+            {
+                if($("#searchYoutube").is(":visible"))
+                {
+                    $("#searchYoutube").hide();
+                    $("#editList").show();
+                    playTrack($("#playlist > li")[0]);
+                }
+                
+                return false;
+            }
+            
+            function playTrack(obj)
+            {
+                if(current_track)
+                {
+                    current_track.css('color','black');
+                    current_track.css('text-decoration','none');
+                }
+                
+                current_track = $(obj);
+                $("#result").empty();
+                current_track.css('color','green');
+                current_track.css('text-decoration','underline');
+                player = null;
+                $('#resultContainer').empty();
+                $('#resultContainer').html('<div id="result"></div>');
+                
+                player = new YT.Player('result', {
+                    height: '390',
+                    width: '480',
+                    videoId: current_track.attr("id"),
+                    events: {
+                      'onReady': onPlayerReady,
+                      'onStateChange': onPlayerStateChange
+                    }
+                  });
+            }
+            
+            function onPlayerReady(evt)
+            {
+                evt.target.playVideo();
+            }
+
+            function onPlayerStateChange(evt)
+            {
+                if(evt.data == YT.PlayerState.ENDED)
+                {
+                    var next = current_track.next();
+
+                    if(next.attr("id"))
+                        playTrack(next);
+                }
+            }
+            
+            function nextVideo(state)
+            {
+                alert(state);
+            }
+            
+            function shareIt()
+            {
+                var ids = "";
+                $("#shareUrl").empty();
+                $("#shareUrl").append("<p>Loading ... </p>");
+                $("#shareUrl").show();
+                
+                $("#playlist > li").each(function(index) {
+                    ids += $(this).attr("id")+",";
+                });
+
+                 /** Only for demo page **/
+                 var dataString = 'newURL='+encodeURIComponent('http://cueyoutube.com/#'+ids)+'&&action=jLy1';
+                 var url = 'http://ly1.fr/API/jLy1.php?' + dataString;
+
+
+                 jQuery.getJSON(url + "&jsoncallback=?",
+                 function(data){
+                     var newUrl = data.newURL;
+                     $("#shareUrl").empty();
+                     $("#shareUrl").append("<p>You can share using this URL: <a target=\"_blank\" href=\""+newUrl+"\">"+newUrl+"</a></p>");
+                 });
+
+                return false;
+            }
+            
+            function remove(obj)
+            {
+                $(obj).parent().remove();
+                
+                if(!$("#playlist").children().size())
+                    $('#playlist').append('<li>Nothing yet! Use the search on the left to find videos to cue up</li>');
+                
+                return false;
+            }
+
+            function cueItem(obj)
+            {
+                var video_id = $(obj).attr("id");
+                var video_title = $(obj).html();
+                $("li:contains('Nothing yet! Use the search on the left to find videos to cue up')").remove();
+                $('#playlist').append($('<li id="'+video_id+'"><span class="videoTitle">'+video_title+'</span><br /><a href="" onclick="return playItem(this);">play</a> | <a href="" onclick="return remove(this);">remove</a></li>'));
+                return false;
+            }
+
+            function cueCurrentVideo(video_title,video_id)
+            {
+                $("li:contains('Nothing yet! Use the search on the left to find videos to cue up')").remove();
+                $('#playlist').append($('<li id="'+video_id+'"><span class="videoTitle">'+video_title+'</span><br /><a href="" onclick="return playItem(this);">play</a> | <a href="" onclick="return remove(this);">remove</a></li>'));
+                return false;
+            }
+        </script>
+    </head>
+    <body>
+        <div class="stack">
+            <div id="header">
+                <div class="stack1of2">
+                    <h1 id="title" class="stackContent">Cue YouTube</h1>
+                    <div id="addThis" class="stackContent">
+                        <!-- AddThis Button BEGIN -->
+                        <div class="addthis_toolbox addthis_default_style" addthis:url="http://cueyoutube.com/">
+                        <a class="addthis_button_facebook_like" fb:like:layout="button_count"></a>
+                        <a class="addthis_button_tweet" tw:via="workingsoftware" tw:related="workingsoftware"></a>
+                        <a class="addthis_counter addthis_pill_style"></a>
+                        </div>
+                        <script type="text/javascript">var addthis_config = {"data_track_clickback":true};</script>
+                        <script type="text/javascript" src="http://s7.addthis.com/js/250/addthis_widget.js#pubid=ra-4e1a250825671adc"></script>
+                        <!-- AddThis Button END -->
+                    </div>
+                </div>
+                <div class="stack1of2">
+                    <h1 id="ws" class="stackContent">A <a target="_blank" href="http://www.workingsoftware.com.au">Working Software</a> joint</h1>
+                </div>
+            </div>
+            <div id="content">
+                <h2 class="stackContent">Create and share YouTube playlists without logging in</h2>
+                <div id="videoSearch" class="stack1of2">
+                    <div class="stackContent">
+                        <h2 id="searchYoutube">Search YouTube: <input type="text" class="search_input" /></h2>
+                        <h2 id="editList">Now playing! <a href="" onclick="return editList();">Click here to find more videos</a></h2>
+                        <div id="resultContainer">
+                            <div id="result"></div>
+                        </div>
+                        <h6>Big thanks to <a target="_blank" href="http://www.9lessons.info/2010/09/youtube-instant-search-with-jquery-and.html">9lessons.info</a> for publishing the YouTube instant search code</h6>
+                        <h6><a href="http://www.myjqueryplugins.com/jLy1">Also props to jLy1 for the JavaScript URL shortener</a></h6>
+                    </div>
+                </div>
+                <div id="playView" class="stack1of2">
+                    <div class="stackContent">
+                        <div id="shareUrl"></div>
+                        <h2>Your playlist | <a href="" onclick="return playIt();">Play it</a> | <a href="#" onclick="return shareIt();">Share it</a></h2>
+                        <h4>Drag items to re-order</h4>
+                        <ol id="playlist" class="dataList">
+                            <li>Nothing yet! Use the search on the left to find videos to cue up</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script type="text/javascript">
+          var _gaq = _gaq || [];
+          _gaq.push(['_setAccount', 'UA-5545730-7']);
+          _gaq.push(['_trackPageview']);
+        
+          (function() {
+            var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+            ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+          })();
+        </script>
+        <script type="text/javascript">
+          (function() {
+            var uv = document.createElement('script'); uv.type = 'text/javascript'; uv.async = true;
+            uv.src = ('https:' == document.location.protocol ? 'https://' : 'http://') + 'widget.uservoice.com/sa9qlexkBhIciOZBvTX1og.js';
+            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(uv, s);
+          })();
+        </script>
+    </body>
+</html>
